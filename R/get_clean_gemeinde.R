@@ -10,47 +10,132 @@
 #' @export
 #'
 #' @examples
-get_clean_gemeinde = function(gkz, data_all, years_range = 2004:2022){
 
-  # theoretical data for all years the same
-  theoretical = dplyr::tibble(
-    year = years_range,
-    gkz
-  )
+get_clean_gemeinde = function(gem, data_all, years_range){
 
-  # check which old gemeinden build this gemeinde in 2023
-  zusammenlegungen = get_zusammenlegungen(gkz$gkz, data_all$zusammenlegungen)
-
-  # check if the gkz was changed at some point
-  gkz_aenderungen = get_gkz_aenderungen(gkz$gkz, data_all$gkz_aenderungen)
-
-  # check if that gemeinde had any namensänderung
-  old_names = get_names(gkz$gkz, data_all$namensaenderungen)
-
-
-
+  gem_clean = build_gemeinde(gem, years_range, data_all)
+  return(gem_clean)
 }
 
-#' @title Find the Zusammenlegungen for that gemeinden
-#'
-#' @description
-#' recursively try to find the gemeinden that now make up that single gemeinde
-#'
-get_zusammenlegungen = function(gkz, zusammenlegungen_all){
+build_gemeinde = function(gem, years_range, data_all){
 
-  newest_zusammenlegung = zusammenlegungen_all %>%
-    filter(gemeindekennziffer_neu == gkz) %>% split(.$gemeindekennziffer_alt)
+  # the current state
+  current_gemeinden_this_gemeinde = gem
+  years_list = list(
+    current_gemeinden_this_gemeinde
+  ) %>% setNames(years_range[[1]])
 
-  if(length(newest_zusammenlegung) == 0) {
-    return(NA)
+  current_gkzs = gem$gkz
+  for(y in years_range){
+
+    # check if any of the gkzs of the gemeinde changed in that year
+    new_gkzs = map(current_gkzs, function(gkz){
+      old_gkzs = data_all$gkz_aenderungen %>%
+        mutate(year = (lubridate::year(in_kraft_seit)) - 1) %>% # minus 1
+        filter(year == y) %>%
+        filter(gemeindekennziffer_neu == gkz)
+
+
+      if(nrow(old_gkzs) == 0){
+        return(NA)
+      }else{
+        return(old_gkzs)
+      }
+    })
+
+    # no current gkz was changed
+    no_new_gkzs = all(is.na(new_gkzs))
+    gkzs_to_check_for_zusammenlegung = current_gkzs
+    if(!no_new_gkzs){
+
+      which_is_new = !is.na(new_gkzs)
+
+      # update the current gemeinden
+      new_gemeinden = bind_rows(new_gkzs[which_is_new]) %>%
+        select(gkz = gemeindekennziffer_alt, name=gemeindename)
+
+      updated_current_gemeinden = map(1:nrow(current_gemeinden_this_gemeinde), function(r){
+        row_old = current_gemeinden_this_gemeinde[r, ] %>% mutate(
+          name = as.character(name),
+          gkz = as.character(gkz)
+        )
+
+        if (row_old$name %in% new_gemeinden$name) {
+          row = new_gemeinden[new_gemeinden$name == row_old$name,] %>%
+            mutate(name = as.character(name),
+                   gkz = as.character(gkz))
+          return(row)
+        }
+
+        return(row_old)
+      }) %>% bind_rows()
+
+      current_gemeinden_this_gemeinde = updated_current_gemeinden
+
+
+      # update the gkzs to check
+      gkzs_to_check_for_zusammenlegung = current_gemeinden_this_gemeinde$gkz
+    }
+
+
+    # now check if any of these gkzs was part of a union
+    unioned_gemeinden = map(gkzs_to_check_for_zusammenlegung, function(gkz){
+
+      union_gemeinden = data_all$zusammenlegungen %>%
+        mutate(
+          year = (lubridate::year(in_kraft_seit) - 1)
+        ) %>%
+        filter(year == y) %>%
+        filter(
+         gemeindekennziffer_neu == gkz
+        )
+
+      if(nrow(union_gemeinden) == 0){
+        return(NA)
+      }else{
+        return(union_gemeinden)
+      }
+    })
+
+    # if there was a union
+    if(!all(is.na(unioned_gemeinden))) {
+      unioned_gemeinden = unioned_gemeinden[!is.na(unioned_gemeinden)]
+      unioned_gemeinden = bind_rows(unioned_gemeinden) %>%
+        select(gkz = gemeindekennziffer_alt, name=gemeindename_alt)
+    }else{
+      unioned_gemeinden = current_gemeinden_this_gemeinde
+    }
+
+    ## check for namesänderungen
+    unioned_gemeinden = map(1:nrow(unioned_gemeinden), function(r) {
+      row = unioned_gemeinden[r,] %>% mutate(across(everything(), as.character))
+      gkz = row$gkz
+
+      namensaenderung = data_all$namensaenderungen %>%
+        mutate(year = (lubridate::year(in_kraft_seit)) - 1) %>% # minus 1
+        filter(year == y) %>%
+        filter(gemeindekennziffer == gkz) %>%
+        select(gkz  = gemeindekennziffer,
+               name = gemeindename_alt) %>%
+        mutate(across(everything(), as.character))
+
+      if (nrow(namensaenderung) > 0) {
+        return(namensaenderung)
+      } else{
+        return(row)
+      }
+    }) %>% bind_rows()
+
+    # the current gemeinden that are now building the original one
+    current_gemeinden_this_gemeinde = unioned_gemeinden
+    current_gkzs = current_gemeinden_this_gemeinde$gkz
+
+    # update the gemeinde list
+    years_list[[glue("{y}")]] = current_gemeinden_this_gemeinde
   }
 
 
+  return(years_list)
 }
 
-get_gkz_aenderungen = function(gkz, gkz_aenderungen_all){
 
-}
-
-get_names = function(gkz, namesaenderungen){
-}

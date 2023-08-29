@@ -1,14 +1,23 @@
-#' Title
+#' Create one File that tracks the changes of the gemeinden
+#'
 #' @importFrom janitor clean_names
 #' @importFrom jsonlite fromJSON
 #'
+#' @param current_gemeinden
 #' @param path_to_aenderungen
 #'
 #' @return
 #' @export
 #'
 #' @examples
-get_clean_gemeinden = function(path_to_aenderungen = NULL) {
+get_clean_gemeinden = function(current_gemeinden, year_gemeinde_data=2021, path_to_aenderungen = NULL) {
+
+  # just for testing
+  current_gemeinden = rajudas::oe_gem_data(year_gemeinde_data) %>%
+    st_drop_geometry() %>%
+    rename(
+      gkz = id
+    )
 
   if(is.null(path_to_aenderungen)){
     stop("Path to änderungs-file is missing!")
@@ -28,14 +37,15 @@ get_clean_gemeinden = function(path_to_aenderungen = NULL) {
   ) %>% map(janitor::clean_names)
 
 
-  # get gemeinde data for 2023
-  gemeinden2023 = jsonlite::fromJSON("https://www.statistik.at/gs-atlas/ATLAS_IMAP_WFS/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=ATLAS_IMAP_WFS:DATA_GEM_GDB_DDT_DS_PG&outputFormat=application%2Fjson&viewparams=DDT:mv_t0278_them_bev_alter_2023;YEAR:2023-01-01;V1:bev_gesamt;V2:bev_gesamt;V1_ABS:bev_gesamt;GEN:100;V2FILTER:-1;WIENFLAG:23;") %>% .[["features"]] %>%
-    unnest(properties) %>%
-    select(gkz=ID, name=NAME)
 
   # for each gemeinde in 2023 find the gkz(s) this gemeinde was in the past
-  gemeinden2023_list = gemeinden2023 %>% split(.$gkz)
+  current_gemeinden_list = current_gemeinden %>% split(.$gkz)
 
-  map(gemeinden2023_list, ~get_clean_gemeide(.x, data_all))
 
+  # indedx 1569 is gemeinde with gkz: 61442 - which had two zusammenlegungen
+  # indedx 1633 has gkz änderung and zusammenlegung
+  all = imap(current_gemeinden_list[1:10], function(gem, i){
+    g = get_clean_gemeinde(gem, data_all = data_all, years_range = (year_gemeinde_data):2002)
+    return(g)
+  }) %>% map(bind_rows)
 }

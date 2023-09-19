@@ -8,7 +8,8 @@ read_lst_data(
   dir_with_excels = NULL,
   sex = "Zusammen",
   type = "Nettobezüge",
-  variable = "Median"
+  variable = "Median",
+  out_dir = NULL
 )
 }
 \arguments{

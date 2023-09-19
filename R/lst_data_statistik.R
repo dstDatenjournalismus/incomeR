@@ -16,7 +16,22 @@
 read_lst_data = function(dir_with_excels = NULL,
                          sex = "Zusammen",
                          type = "Nettobezüge",
-                         variable = "Median") {
+                         variable = "Median",
+                         out_dir = NULL) {
+
+
+  # if saving to disk...
+  if(!is.null(out_dir)) {
+    out_basename = glue("{sex}_{type}_{variable}.Rdata")
+    out_filename = here(out_dir, out_basename)
+
+    # when a file with the same paramters was already created
+    if(file.exists(out_filename)){
+      cli::cli_h2("File with these parameters already exists on disk -> Returning...")
+      pre_computed_data = readRDS(out_filename)
+      return(pre_computed_data)
+    }
+  }
 
   if(is.null(dir_with_excels)){
     stop("You must provide the path to the directory where all the .xlsx files are in")
@@ -57,7 +72,12 @@ read_lst_data = function(dir_with_excels = NULL,
 
     return(data_filtered)
 
-  })
+  }) %>% setNames(years)
+
+
+  if(!is.null(out_dir)){
+    saveRDS(data_all, file = out_filename)
+  }
 
   return(data_all)
 

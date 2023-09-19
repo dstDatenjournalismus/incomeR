@@ -36,3 +36,8 @@ raw_data = incomeR::read_lst_data(
  6 10302     24185.42 Zusammen Nettobezüge Mittelwert 04   
  7 10303     24456.9  Zusammen Nettobezüge Mittelwert 04   
 ```
+
+## Warum haben die `Teil`- und `Rest`-Gemeinden keine Werte?
+
+- 
+

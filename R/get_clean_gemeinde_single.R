@@ -1,9 +1,7 @@
-#' Title
+#' Get the history of a current gemeinde
 #'
-#' @importFrom lubridate year
-#' @importFrom dplyr tibble
-#'
-#' @param gkz
+#' @param gem
+#' @param years_range
 #' @param data_all
 #'
 #' @return
@@ -11,13 +9,7 @@
 #'
 #' @examples
 
-get_clean_gemeinde = function(gem, data_all, years_range){
-
-  gem_clean = build_gemeinde(gem, years_range, data_all)
-  return(gem_clean)
-}
-
-build_gemeinde = function(gem, years_range, data_all){
+get_clean_gemeinde = function(gem, years_range, data_all){
 
   # the current state
   current_gemeinden_this_gemeinde = gem
@@ -28,13 +20,15 @@ build_gemeinde = function(gem, years_range, data_all){
   current_gkzs = gem$gkz
   for(y in years_range){
 
+
     # check if any of the gkzs of the gemeinde changed in that year
-    new_gkzs = map(current_gkzs, function(gkz){
+    new_gkzs = map(current_gkzs, function(gkz) {
+
+
       old_gkzs = data_all$gkz_aenderungen %>%
-        mutate(year = (lubridate::year(in_kraft_seit)) - 1) %>% # minus 1
+        mutate(year = (lubridate::year(in_kraft_seit)) - 1) %>% # minus 1 -> Wie war der stand ein Jahr vorher?
         filter(year == y) %>%
         filter(gemeindekennziffer_neu == gkz)
-
 
       if(nrow(old_gkzs) == 0){
         return(NA)
@@ -46,24 +40,29 @@ build_gemeinde = function(gem, years_range, data_all){
     # no current gkz was changed
     no_new_gkzs = all(is.na(new_gkzs))
     gkzs_to_check_for_zusammenlegung = current_gkzs
+
+    # there are new gkzs for any of the current ones!
     if(!no_new_gkzs){
 
+      # which of the current one has new ones
       which_is_new = !is.na(new_gkzs)
 
       # update the current gemeinden
       new_gemeinden = bind_rows(new_gkzs[which_is_new]) %>%
-        select(gkz = gemeindekennziffer_alt, name=gemeindename)
+        select(gkz = gemeindekennziffer_alt, gkz_neu=gemeindekennziffer_neu, name=gemeindename)
 
+      # what does this do?
       updated_current_gemeinden = map(1:nrow(current_gemeinden_this_gemeinde), function(r){
         row_old = current_gemeinden_this_gemeinde[r, ] %>% mutate(
           name = as.character(name),
           gkz = as.character(gkz)
         )
 
-        if (row_old$name %in% new_gemeinden$name) {
-          row = new_gemeinden[new_gemeinden$name == row_old$name,] %>%
+        if (row_old$gkz %in% new_gemeinden$gkz_neu) {
+          row = new_gemeinden[new_gemeinden$gkz_neu == row_old$gkz,] %>%
             mutate(name = as.character(name),
-                   gkz = as.character(gkz))
+                   gkz = as.character(gkz)) %>%
+            select(-gkz_neu)
           return(row)
         }
 
@@ -73,7 +72,7 @@ build_gemeinde = function(gem, years_range, data_all){
       current_gemeinden_this_gemeinde = updated_current_gemeinden
 
 
-      # update the gkzs to check
+      # update the gkzs to check for a potential union
       gkzs_to_check_for_zusammenlegung = current_gemeinden_this_gemeinde$gkz
     }
 

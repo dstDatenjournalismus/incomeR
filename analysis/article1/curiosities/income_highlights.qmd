@@ -1,0 +1,35 @@
+---
+title: "Income Highlights"
+lang: de
+date: today
+format:
+  html:
+    toc: true
+    toc-location: body
+    toc-title: Übersicht
+    cold-fold: true
+    theme: cosmo   # cosmo bootswatch theme
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(here)
+library(glue)
+library(sf)
+library(rajudas)
+library(jsonlite)
+```
+
+**Daten**
+```{r}
+
+```
+
+
+
+# Gemeinde mit dem höchsten Mittleren Einkommen 
+
+## Arith. Mittel
+
+## Median

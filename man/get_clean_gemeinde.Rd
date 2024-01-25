@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_clean_gemeinde_single.R
 \name{get_clean_gemeinde}
 \alias{get_clean_gemeinde}
-\title{Title}
+\title{Get the history of a current gemeinde}
 \usage{
 get_clean_gemeinde(gem, years_range, data_all)
 }
@@ -10,5 +10,5 @@ get_clean_gemeinde(gem, years_range, data_all)
 \item{data_all}{}
 }
 \description{
-Title
+Get the history of a current gemeinde
 }

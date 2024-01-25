@@ -17,25 +17,8 @@ read_lst_data = function(dir_with_excels = NULL,
                          sex = "Zusammen",
                          type = "Nettobezüge",
                          variable = "Median",
-                         out_dir = NULL) {
-
-
-  # if saving to disk...
-  if(!is.null(out_dir)) {
-    out_basename = glue("{sex}_{type}_{variable}.Rdata")
-    out_filename = here(out_dir, out_basename)
-
-    # when a file with the same paramters was already created
-    if(file.exists(out_filename)){
-      cli::cli_h2("File with these parameters already exists on disk -> Returning...")
-      pre_computed_data = readRDS(out_filename)
-      return(pre_computed_data)
-    }
-  }
-
-  if(is.null(dir_with_excels)){
-    stop("You must provide the path to the directory where all the .xlsx files are in")
-  }
+                         out_dir = NULL,
+                         force=FALSE) {
 
   # list all the excels -----------------------------------------------------
   excel_files = dir(dir_with_excels, ".*Gem.*\\.xls[x]?$", full.names = T)
@@ -43,9 +26,32 @@ read_lst_data = function(dir_with_excels = NULL,
     stop("There must be at least 18 files... Maybe the wrong folder?!")
   }
 
+  if(is.null(dir_with_excels)){
+    stop("You must provide the path to the directory where all the .xlsx files are in")
+  }
 
   # read the years from the files -------------------------------------------
   years = str_match(basename(excel_files), "\\d{2,4}") %>% .[, 1]
+  max_year = max(years)
+
+  # if saving to disk...
+  if(!is.null(out_dir)) {
+
+    sex_chr = paste0(sex, collapse = "_")
+    type_chr = paste0(type, collapse = "_")
+    variable_chr = paste0(variable, collapse = "_")
+
+
+    out_basename = glue("{sex_chr}_{type_chr}_{variable_chr}_to{max_year}.Rdata")
+    out_filename = here(out_dir, out_basename)
+
+    # when a file with the same paramters was already created
+    if(file.exists(out_filename) & !force){
+      cli::cli_h2("File with these parameters already exists on disk -> Returning...")
+      pre_computed_data = readRDS(out_filename)
+      return(pre_computed_data)
+    }
+  }
 
   data_all = purrr::map(seq_along(excel_files), function(i) {
 
@@ -76,6 +82,7 @@ read_lst_data = function(dir_with_excels = NULL,
 
 
   if(!is.null(out_dir)){
+    unlink(out_filename)
     saveRDS(data_all, file = out_filename)
   }
 

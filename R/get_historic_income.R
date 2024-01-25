@@ -16,14 +16,6 @@ get_historic_income = function(raw_data, historic_gemeindestaende){
     years_with_lst_data = as.character(glue("20{years_with_lst_data}"))
   }
 
-  # check if only one variable
-  how_many_variables = raw_data %>%
-    count(variable)
-
-  if(nrow(how_many_variables) > 1){
-    stop("The raw data can only have one variable (like the median...)")
-  }
-
   # pre format raw data
   year_ = raw_data$year[[1]]
   if(!str_detect(year_, "\\d{4}")){
@@ -33,7 +25,7 @@ get_historic_income = function(raw_data, historic_gemeindestaende){
       )
   }
 
-  # for each historic gemeindestand
+  # for each historic gemeindestand at the income
   income_all_gemeinden = map(seq_along(historic_gemeindestaende), function(i){
 
     # the current gemeinde
@@ -49,11 +41,21 @@ get_historic_income = function(raw_data, historic_gemeindestaende){
                        raw_data,
                        join_by(year == year,
                                gkz == gkz)) %>%
-      mutate(.before = gkz, gkz_current = current_gem)
+      mutate(.before = gkz, gkz_current = current_gem) %>%
+      mutate(
+        year = as.numeric(year),
+        val = as.numeric(val)
+      )
 
     return(income)
 
   })
+
+  # set Names
+  gkzs_current = map_chr(income_all_gemeinden, function(inc){
+    return(inc$gkz_current[[1]])
+  })
+  names(income_all_gemeinden) = gkzs_current
 
   return(income_all_gemeinden)
 }

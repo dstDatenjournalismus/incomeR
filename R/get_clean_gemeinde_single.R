@@ -17,14 +17,18 @@ get_clean_gemeinde = function(gem, years_range, data_all){
     current_gemeinden_this_gemeinde
   ) %>% setNames(years_range[[1]])
 
+  # die gemeinden aus denen die aktuelle Gemeinde potentiell bestanden haben kann
   current_gkzs = gem$gkz
   for(y in years_range){
 
+    ######
+    # GKZ-Änderungen
+    ######
 
-    # check if any of the gkzs of the gemeinde changed in that year
+    # Für jede Gemeinde aus der die aktuelle Gemeinde potentiell mal bestanden hat
     new_gkzs = map(current_gkzs, function(gkz) {
 
-
+      # finde die alten Gemeindekennziffern
       old_gkzs = data_all$gkz_aenderungen %>%
         mutate(year = (lubridate::year(in_kraft_seit)) - 1) %>% # minus 1 -> Wie war der stand ein Jahr vorher?
         filter(year == y) %>%
@@ -37,11 +41,11 @@ get_clean_gemeinde = function(gem, years_range, data_all){
       }
     })
 
-    # no current gkz was changed
+    # wenn in diesem Jahr für keine der potentiellen Gemeinden die GKZ geändert wurde
     no_new_gkzs = all(is.na(new_gkzs))
     gkzs_to_check_for_zusammenlegung = current_gkzs
 
-    # there are new gkzs for any of the current ones!
+    # Falls sich für manche Gemeinden die GKZ doch geändert hat
     if(!no_new_gkzs){
 
       # which of the current one has new ones
@@ -77,7 +81,9 @@ get_clean_gemeinde = function(gem, years_range, data_all){
     }
 
 
-    # now check if any of these gkzs was part of a union
+    ######
+    # Zusammenlegungen
+    ######
     unioned_gemeinden = map(gkzs_to_check_for_zusammenlegung, function(gkz){
 
       union_gemeinden = data_all$zusammenlegungen %>%
@@ -105,7 +111,9 @@ get_clean_gemeinde = function(gem, years_range, data_all){
       unioned_gemeinden = current_gemeinden_this_gemeinde
     }
 
-    ## check for namesänderungen
+    ######
+    # Zusammenlegungen
+    ######
     unioned_gemeinden = map(1:nrow(unioned_gemeinden), function(r) {
       row = unioned_gemeinden[r,] %>% mutate(across(everything(), as.character))
       gkz = row$gkz

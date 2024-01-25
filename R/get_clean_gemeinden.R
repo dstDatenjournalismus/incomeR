@@ -18,7 +18,7 @@ get_clean_gemeinden_raw = function(year_gemeinde_data = 2021,
   # if data is to be saved!
   if(!is.null(out_dir)){
 
-    output_basename = glue("{year_gemeinde_data}.Rdata")
+    output_basename = glue("historic_gemeinden_upto_{year_gemeinde_data}.Rdata")
     output_filename = here(out_dir, output_basename)
 
 
@@ -62,6 +62,7 @@ get_clean_gemeinden_raw = function(year_gemeinde_data = 2021,
   # indedx 1569 is gemeinde with gkz: 61442 - which had two zusammenlegungen
   # indedx 1633 has gkz änderung and zusammenlegung
   # Gnas (with gkz: 62380) is kind of strange
+  # i = which(names(current_gemeinden_list) == 62380)
   # Murfeld has index 1514
   if(TEST){
     current_gemeinden_list = current_gemeinden_list[1300:1750]
@@ -74,8 +75,8 @@ get_clean_gemeinden_raw = function(year_gemeinde_data = 2021,
     gem = current_gemeinden_list[[i]]
 
     g = get_clean_gemeinde(gem,
-                           data_all = data_all,
-                           years_range = (year_gemeinde_data):2002)
+                           years_range = (year_gemeinde_data):2002,
+                           data_all = data_all)
     return(g)
   })
 
@@ -105,15 +106,17 @@ replace_2012_2013 = function(clean_gemeinden_raw){
         return(row)
       }
 
-      # if its 2012 and the gemeinde exists with the same name in 2012, give it the 2013 gkz
+      # if its 2012 and the gemeinde exists with the same name in 2013, give it the 2013 gkz
       gems_2013 = gem %>% filter(year =="2013") %>% pull(name)
       in_2013 = row$name %in% gems_2013
 
       ## Kirchbach ARTIKEL!!
+      ## in dem sheet gkz änderungen ist der Name falsch...
       if(row$name == "Kirchbach in Steiermark"){
         row$name = "Kirchbach in der Steiermark"
       }
 
+      # was passiert hier??
       if(any(str_detect(gems_2013, row$name))){
         row_2013 = gem %>% filter(year=="2013") %>% filter(str_detect(name, row$name))
         if(nrow(row_2013) > 1){
@@ -125,6 +128,7 @@ replace_2012_2013 = function(clean_gemeinden_raw){
       }
 
       # manual cases
+      # Warum mache ich das?!
       # Trofaiach
       if (row$gkz %in% c("61102",
                          "61103",

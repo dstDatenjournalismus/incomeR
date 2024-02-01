@@ -54,7 +54,7 @@ processBlData = function(path, sex, type, variable, output_dir){
     bl_adjusted = bl_clean %>%
       left_join(data_vpi, join_by(year)) %>%
       mutate(val=as.numeric(val)) %>%
-      mutate(val_real = if_else(variable=="Anzahl", val, as.numeric(val) / (index_2022 / 100)))
+      mutate(val_real = if_else(variable=="Anzahl", val, round(as.numeric(val) / (index_2022 / 100),2)))
 
     bl_id = bl$id[[1]]
     bl_adjusted

@@ -1,12 +1,12 @@
 #' Create VPI timeseries
 #'
-#' @param index_year which year to set to compare to
+#' @param upper_index_year which year to set to compare to
 #'
 #' @return
 #' @export
 #'
 #' @examples
-get_yearly_inflation = function(index_year){
+get_yearly_inflation = function(upper_index_year = 2022, lower_index_year = 2004){
 
   # yearly inflation
   data_vpi = incomeR::data_vpi_raw
@@ -16,7 +16,7 @@ get_yearly_inflation = function(index_year){
     select(jahr, vpi = jahres_durch_schnitt) %>%
     mutate(jahr = as.numeric(jahr)) %>%
     arrange(desc(jahr)) %>%
-    filter(jahr <= index_year) %>% rename(year = jahr) %>% split(.$year) -> l
+    filter(jahr <= upper_index_year & jahr >= lower_index_year) %>% rename(year = jahr) %>% split(.$year) -> l
 
   yearly_vpi = l[sort(names(l), decreasing = T)]
 
@@ -30,6 +30,24 @@ get_yearly_inflation = function(index_year){
     }
   }
 
-  data_vpi = bind_rows(yearly_vpi) %>% mutate("index_{index_year}" := cumulative_values)
+  data_vpi = bind_rows(yearly_vpi) %>% mutate("index_{upper_index_year}" := cumulative_values)
+
+  # now do it backwards
+  data_vpi_ascending = data_vpi %>% arrange(year) %>% split(.$year)
+  cumulative_values_index_lower = numeric(length = length(data_vpi_ascending))
+  for(i in seq_along(data_vpi_ascending)){
+    if(i == 1){
+      cumulative_values_index_lower[[i]] = 100
+    }else{
+      change = data_vpi_ascending[[i]]$vpi/100
+      cumulative_values_index_lower[[i]] = cumulative_values_index_lower[[i-1]] + (change * cumulative_values_index_lower[[i-1]])
+    }
+  }
+
+  data_vpi = data_vpi %>%
+    mutate(
+      "index_{lower_index_year}" := cumulative_values_index_lower %>% rev
+    )
+
   return(data_vpi)
 }

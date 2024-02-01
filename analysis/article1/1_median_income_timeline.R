@@ -74,12 +74,10 @@ data_vpi = get_yearly_inflation(index_year = max_year)
 # -------------------------------------------------------------------------
 data_real_all = map(historic_gem_income_data, function(data_nom) {
   data_real = data_nom %>%
-    pivot_wider(
-      names_from = variable,
-      values_from = val
-    ) %>%
+    pivot_wider(names_from = variable,
+                values_from = val) %>%
     left_join(data_vpi, join_by(year)) %>%
-    mutate(Median_real = Median / (index_2022 / 100)) %>% janitor::clean_names()
+    mutate(Median_real = round(Median / (index_2022 / 100), 2)) %>% janitor::clean_names()
   return(data_real)
 }) %>%
   bind_rows() %>%
@@ -88,19 +86,18 @@ data_real_all = map(historic_gem_income_data, function(data_nom) {
 
 data_real_all %>%
   group_by(gkz, year) %>%
-  summarise(
-    median_real_weighted = weighted.mean(median_real, anzahl),
-    agg = if_else(n() > 1, 1, 0)
-  ) -> data_clean
+  summarise(median_real_weighted = round(weighted.mean(median_real, anzahl), 2),
+            agg = if_else(n() > 1, "1", "")) -> data_clean
 
 # -------------------------------------------------------------------------
 ## Data for each Bundesland
 # -------------------------------------------------------------------------
+
 # bundeslaender
 data_each_bl = processBlData(path = "~/projects/dst/DATEN/statistik_austria/lst_daten/AN_gjvz_BL_2004-2022.xlsx", sex=sex, type=type, variable="Median")
 
 data_each_bl %>%
-  mutate(year=as.numeric(year), agg=0) %>%
+  mutate(year=as.numeric(year), agg="") %>%
   select(
     gkz = id,
     year,
@@ -109,32 +106,48 @@ data_each_bl %>%
   ) %>% filter(!is.na(gkz)) -> per_bl
 
 
-data_clean_all = bind_rows(data_clean, per_bl)
+data_clean_all = bind_rows(data_clean, per_bl) %>% ungroup() %>%
+  rename(jahr = year, median_real = median_real_weighted)
 
 
-# data wide (each year as a column)
-dw = data_clean_all %>% ungroup %>% select(-agg) %>%  pivot_wider(names_from = year, values_from = median_real_weighted)
 
 # -------------------------------------------------------------------------
 ## Rausschreiben
 # -------------------------------------------------------------------------
 
-# one file for all gemeinden
-op_all = "~/projects/dst/2023/setembro/2023-09-einkommens-karte/public/data/median_income_gemeinden_bls_oe.csv"
-write_csv(data_clean_all, op_all)
-fs::file_size(op_all)
-
-# wide
-op_all_wide = makePath(here("output/article1/1_median_income_all_gemeinden/median_all_gemeinden_wide.csv"))
-write_csv(dw, op_all_wide)
-fs::file_size(op_all_wide)
-
-# for each gemeinde gemeinden
-makeGemeindeData(output_dir = "~/projects/dst/2023/setembro/2023-09-einkommens-karte/public/data/", data = data_real_all, one_val_per_year=F)
+# one file each gemeinde
+per_gkz = data_clean_all %>% split(.$gkz)
+iwalk(per_gkz, function(x, nm){
+  print(nm)
+  op = makePath(here(glue("output/article1/zeitreihen_real/{nm}.csv")))
+  d = x %>%
+    select(-gkz)
+  data.table::fwrite(d, op)
+})
 
 
-# save the data for each year (in case we wanna show different years)
-makeYearData("~/projects/dst/2023/setembro/2023-09-einkommens-karte/public/data/", data = data_real_all)
+
+# -------------------------------------------------------------------------
+# realeinkommen2022 -------------------------------------------------------
+# -------------------------------------------------------------------------
+realeinkommen2022 = data_clean_all %>%
+  filter(str_detect(gkz, "\\d{5}") & jahr==2022) %>%
+  select(-jahr, -agg)
+
+op_realeinkommen = makePath(here("output/article1/realeinkommen.csv"))
+write_csv(realeinkommen2022, op_realeinkommen)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

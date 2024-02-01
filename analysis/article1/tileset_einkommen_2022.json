@@ -1,0 +1,10 @@
+{
+ "version": 1,
+ "layers": {
+  "gemeinde_einkommen_median_real_2022": {
+   "source": "mapbox://tileset-source/derstandardat/gemeinden_einkommen_2022",
+   "minzoom": 0,
+   "maxzoom": 10
+  }
+}
+}

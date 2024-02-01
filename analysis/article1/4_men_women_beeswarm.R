@@ -4,6 +4,7 @@ library(glue)
 library(sf)
 library(rajudas)
 library(jsonlite)
+devtools::load_all()
 
 # params ------------------------------------------------------------------
 
@@ -26,7 +27,7 @@ path_excel_bls = here("~/projects/dst/DATEN/statistik_austria/lst_daten/AN_gjvz_
 # where to save the processed lst data
 out_dir_lst_data = here("processed_lst_data/")
 
-raw_data = incomeR::read_lst_data(
+raw_data = read_lst_data(
   dir_with_excels = dir_with_excels_to_gemeindedaten,
   sex = sex,
   type = type,
@@ -42,18 +43,13 @@ raw_data = bind_rows(raw_data)
 ## Only use data for 2022
 # -------------------------------------------------------------------------
 data_men_woman_22 = raw_data %>%
-  mutate(
-    year = as.numeric(glue("20{year}"))
-  ) %>%
-  filter(year==2022)
-
+  mutate(year = as.numeric(glue("20{year}"))) %>%
+  filter(year == 2022)
 
 data_men_woman_wide = data_men_woman_22 %>%
   filter(str_detect(gkz, "\\d{5}")) %>%
-  select(gkz, val,sex) %>%
+  select(gkz, val, sex) %>%
   pivot_wider(names_from = sex, values_from = val)
-
-
 
 # -------------------------------------------------------------------------
 # for datawrapper choropleth map ------------------------------------------

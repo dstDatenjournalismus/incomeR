@@ -78,7 +78,7 @@ data_top_low_adjusted = map(seq_along(historic_top_low_data), function(i){
 
   d %>%
     left_join(data_vpi, join_by(year)) %>%
-    mutate(val_real = if_else(variable == "Anzahl", val, val / (index_2022 / 100))) %>%
+    mutate(val_real = if_else(variable == "Anzahl", val, round(val / (index_2022 / 100),2))) %>%
     select(year, gkz_current, name,  val_real, variable) %>%
     pivot_wider(names_from = variable,
                 values_from = val_real) -> data_clean
@@ -90,22 +90,27 @@ data_top_low_adjusted = map(seq_along(historic_top_low_data), function(i){
 # -------------------------------------------------------------------------
 # get the weighted quantiles ----------------------------------------------
 # -------------------------------------------------------------------------
-data_agg = map(seq_along(data_top_low_adjusted), function(i){
-
+data_agg = map(seq_along(data_top_low_adjusted), function(i) {
   d_adj = data_top_low_adjusted[[i]]
-  name = d_adj %>% filter(year==2022) %>% pull(name)
+  name = d_adj %>% filter(year == 2022) %>% pull(name)
   d_adj %>%
     group_by(year, gkz_current) %>%
     summarise(across(Median:P90, function(x) {
-      weighted.mean(x, Anzahl)
-    })) %>% mutate(name = name) -> d_adj_agg
+      round(weighted.mean(x, Anzahl), 2)
+    }),
+    agg = if_else(n() > 1, "1", "")) %>% ungroup() -> d_adj_agg
 
   return(d_adj_agg)
-
 })
 
 
+
+
+
+# -------------------------------------------------------------------------
 # data for bundesländer ---------------------------------------------------
+# -------------------------------------------------------------------------
+
 data_each_bl = processBlData(path = "~/projects/dst/DATEN/statistik_austria/lst_daten/AN_gjvz_BL_2004-2022.xlsx", sex=sex,type=type, variable=variable)
 
 data_bls = data_each_bl %>%
@@ -118,17 +123,59 @@ data_bls = data_each_bl %>%
   )
 
 
+
+# -------------------------------------------------------------------------
 # join all ----------------------------------------------------------------
-data_gemeinden = bind_rows(data_agg)
-data_bls
+# -------------------------------------------------------------------------
 
-all = bind_rows(
-  data_gemeinden,
-  data_bls
-)
+cols_def = c("gkz" = as.character, "year" = as.numeric, "P10" = as.numeric, "P20" = as.numeric, "Median" = as.numeric, "P80" = as.numeric, "P90" = as.numeric, "agg" = as.character)
 
-op = makePath(here("output/article1/top_low/all_top_low.csv"))
-write_csv(all, op)
+data.table::rbindlist(data_agg) %>%
+  rename(gkz=gkz_current) %>%
+  ungroup() %>%
+  select(all_of(names(cols_def)), agg) %>%
+  imap(function(d, nm){
+    d = cols_def[[nm]](d)
+    return(d)
+  }) %>%  bind_cols() -> data_gemeinden_clean
+
+data_bls %>%
+  rename(gkz = gkz_current) %>%
+  mutate(agg = "") %>%
+  select(all_of(names(cols_def))) %>%
+  imap(function(d, nm) {
+    d = cols_def[[nm]](d)
+    return(d)
+  }) %>%  bind_cols() -> data_bls_clean
+
+data_all = bind_rows(data_gemeinden_clean, data_bls_clean) %>%
+  rename(jahr = year) %>%
+  rename_with(function(x) {
+    return(paste0(x, "_real"))
+  }, P10:P90) %>%
+  janitor::clean_names()
+
+
+# -------------------------------------------------------------------------
+# write out ---------------------------------------------------------------
+# -------------------------------------------------------------------------
+data_p90_p10 = data_all %>% select(gkz, jahr, p10_real, median_real, p90_real, agg)
+data_p80_p20 = data_all %>% select(gkz, jahr, p20_real, median_real, p80_real, agg)
+
+data_all_list = list(median_p90_p10 = data_p90_p10, median_p80_p20  = data_p80_p20)
+
+
+iwalk(data_all_list, function(d, name_mode) {
+  data_split = d %>% split(.$gkz)
+
+  iwalk(data_split, function(d_gem, name_gem) {
+    d = d_gem %>% select(-gkz)
+    op = makePath(here(glue(
+      "output/article1/{name_mode}/{name_gem}.csv"
+    )))
+    data.table::fwrite(d, op)
+  })
+})
 
 
 # -------------------------------------------------------------------------
